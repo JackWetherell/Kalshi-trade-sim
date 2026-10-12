@@ -1,0 +1,14 @@
+# One-shot health check (see deploy/healthcheck.sh). Triggered by kalshi-edge-health.timer.
+# A nonzero exit marks the unit failed, visible via `systemctl --user --failed` / journalctl.
+[Unit]
+Description=kalshi-edge health check
+
+[Service]
+Type=oneshot
+WorkingDirectory=%REPO_DIR%
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%REPO_DIR%/deploy/healthcheck.sh --config configs/paper.yaml
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=%REPO_DIR%/.venv %h/.cache/uv

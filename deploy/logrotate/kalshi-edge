@@ -1,0 +1,13 @@
+# Example logrotate snippet. Install as a USER config (no root needed):
+#   logrotate --state ~/.local/state/kalshi-edge-logrotate.state deploy/logrotate/kalshi-edge
+# run daily from cron / a systemd user timer. Replace /ABS/PATH/TO/REPO.
+# copytruncate is required: the trader keeps the file handle open.
+/ABS/PATH/TO/REPO/var/paper/trader.log.jsonl /ABS/PATH/TO/REPO/var/demo/trader.log.jsonl {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}

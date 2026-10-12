@@ -1,0 +1,35 @@
+# kalshi-edge public order-book RECORDER (systemd --user unit). Read-only public data, no credentials.
+# Writes gzip JSONL snapshots under data/ for later backtests. Runs continuously
+# (`data record` with rounds=0). For a one-shot-per-interval style, use the .timer instead and
+# change ExecStart to add `--rounds 1` (see kalshi-edge-recorder.timer).
+#
+# INSTALL: replace %REPO_DIR%, copy to ~/.config/systemd/user/, daemon-reload, enable --now.
+
+[Unit]
+Description=kalshi-edge public market recorder (read-only)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%REPO_DIR%
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONUNBUFFERED=1
+UnsetEnvironment=KALSHI_PROD_KEY_ID KALSHI_PROD_PRIVATE_KEY_PATH KALSHI_DEMO_KEY_ID KALSHI_DEMO_PRIVATE_KEY_PATH
+ExecStart=/usr/bin/env uv run --frozen kalshi-edge data record --config configs/research.yaml --interval 60
+Restart=on-failure
+RestartSec=60
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=%REPO_DIR%/var %REPO_DIR%/data %REPO_DIR%/.venv %h/.cache/uv
+ProtectControlGroups=yes
+ProtectKernelTunables=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=default.target

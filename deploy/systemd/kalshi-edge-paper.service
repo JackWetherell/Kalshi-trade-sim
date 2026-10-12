@@ -1,0 +1,53 @@
+# kalshi-edge PAPER trader (systemd --user unit).
+# Live public production market data, LOCAL virtual exchange only. No credential is read.
+#
+# INSTALL (see docs/DEPLOYMENT.md):
+#   1. Replace %REPO_DIR% below with the absolute path of your checkout (or use
+#      `systemctl --user edit kalshi-edge-paper` to override WorkingDirectory/ExecStart).
+#   2. cp deploy/systemd/kalshi-edge-paper.service ~/.config/systemd/user/
+#   3. systemctl --user daemon-reload && systemctl --user enable --now kalshi-edge-paper
+#
+# THERE IS DELIBERATELY NO "LIVE" UNIT. Live trading is interactive-only: it needs a fresh
+# human-typed arming ceremony in a TTY, which a service cannot provide. Arming tokens exist in
+# process memory only, so a reboot, crash or service restart can never re-arm live trading.
+# Do not create a live unit, a cron job or a wrapper script that tries to.
+
+[Unit]
+Description=kalshi-edge paper trader (virtual money, public data)
+Documentation=file://%REPO_DIR%/docs/DEPLOYMENT.md
+After=network-online.target
+Wants=network-online.target
+# Restart limits: at most 5 starts per 10 minutes, then the unit stays failed until an operator looks.
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%REPO_DIR%
+# `uv` must be on the service PATH (adjust if installed elsewhere).
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONUNBUFFERED=1
+# Paper/demo never use production credentials: strip them even if the user manager has them.
+UnsetEnvironment=KALSHI_PROD_KEY_ID KALSHI_PROD_PRIVATE_KEY_PATH
+ExecStart=/usr/bin/env uv run --frozen kalshi-edge run --mode paper --config configs/paper.yaml
+# SIGTERM is handled by the trader (finishes the current step, persists state, releases the lock).
+KillSignal=SIGTERM
+TimeoutStopSec=60
+# The single-instance lock exits 2 when another trader runs; do not restart-loop on that.
+Restart=on-failure
+RestartSec=30
+RestartPreventExitStatus=2 3
+
+# Hardening subset valid for user units.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+# Writable: state (var), recorded data, reports. uv may also need its cache and the venv.
+ReadWritePaths=%REPO_DIR%/var %REPO_DIR%/data %REPO_DIR%/reports %REPO_DIR%/.venv %h/.cache/uv
+ProtectControlGroups=yes
+ProtectKernelTunables=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=default.target

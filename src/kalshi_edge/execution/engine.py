@@ -57,6 +57,14 @@ class ExecutionEngine:
             self.store.update_order(cid, OrderState.REJECTED, self.clock.now(),
                                     note=str(exc)[:200])
             return SubmitResult(cid, OrderState.REJECTED, None, (), str(exc))
+        except Exception as exc:
+            # Unclassified failure (rate limit, transport, bug): the order may or may not
+            # exist. Treat exactly like an ambiguous submit: UNKNOWN, query before retry.
+            self.store.update_order(cid, OrderState.UNKNOWN, self.clock.now(),
+                                    note=f"submit_error:{exc.__class__.__name__}")
+            self.store.log_event(self.clock.now(), "submit_error",
+                                 {"client_order_id": cid, "error": repr(exc)[:200]})
+            return self._resolve_one(cid)
         self._apply_status(status)
         fills = self.sync_fills()
         return SubmitResult(cid, status.state, status, tuple(f for f in fills

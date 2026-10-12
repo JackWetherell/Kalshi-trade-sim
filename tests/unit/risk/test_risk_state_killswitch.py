@@ -8,9 +8,9 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from tests.support import T0, D, limits
 
 from kalshi_edge.risk import KillSwitch, RiskState
-from tests.support import D, T0, limits
 
 L = limits()
 
@@ -164,9 +164,6 @@ def test_empty_and_corrupt_files_still_engaged(tmp_path: Path) -> None:
     assert st.engaged and st.reason == "not json at all"
 
 
-@pytest.mark.xfail(strict=True, reason="BUG: KillSwitch.state() raises AttributeError when the "
-                   "file holds valid JSON that is not an object (e.g. '[]', 'null', '5') instead "
-                   "of failing closed with engaged=True (risk/killswitch.py:45)")
 @pytest.mark.parametrize("content", ["[]", "null", "5", '"x"'])
 def test_non_object_json_is_still_engaged(tmp_path: Path, content: str) -> None:
     p = tmp_path / "KILL"

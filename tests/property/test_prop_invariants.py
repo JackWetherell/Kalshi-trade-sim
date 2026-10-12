@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from tests.support import FEES, T0, TICKER, estimate, limits, market, proposal, risk_ctx
 
 from kalshi_edge.domain import (
     AccountSnapshot,
@@ -32,7 +33,6 @@ from kalshi_edge.pricing import (
 )
 from kalshi_edge.risk import Exposure, ExposureItem, HardRiskManager
 from kalshi_edge.runtime.clock import ReplayClock
-from tests.support import FEES, T0, TICKER, estimate, limits, market, proposal, risk_ctx
 
 D = Decimal
 CENTS = st.integers(1, 99).map(lambda n: D(n) / 100)
@@ -140,7 +140,8 @@ def test_quote_bounds(yes: list[tuple[int, int]], no: list[tuple[int, int]], qty
         assert q.fillable_quantity == min(qty, depth)
         assert q.best_price <= q.vwap <= q.worst_price
         fills = walk_asks(b, outcome, qty)
-        assert q.vwap * q.fillable_quantity == sum((f.price * f.quantity for f in fills), D(0))
+        notional = sum((f.price * f.quantity for f in fills), D(0))
+        assert abs(q.vwap * q.fillable_quantity - notional) < D("1e-20")  # Decimal(28) division
         assert q.fee_total == FEES.fee_for_fills(fills)
 
 

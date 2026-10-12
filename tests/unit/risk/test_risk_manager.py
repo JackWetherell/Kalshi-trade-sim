@@ -4,9 +4,20 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import timedelta
-from decimal import Decimal
 
 import pytest
+from tests.support import (
+    FEES,
+    T0,
+    TICKER,
+    D,
+    book,
+    estimate,
+    limits,
+    market,
+    proposal,
+    risk_ctx,
+)
 
 from kalshi_edge.domain import (
     AccountSnapshot,
@@ -28,20 +39,9 @@ from kalshi_edge.risk import (
     RiskState,
     build_exposure,
 )
-from tests.support import (
-    D,
-    FEES,
-    T0,
-    TICKER,
-    book,
-    estimate,
-    limits,
-    market,
-    proposal,
-    risk_ctx,
-)
 
-def bk_at(ask: str, qty: str = "1000"):  # noqa: ANN201
+
+def bk_at(ask: str, qty: str = "1000"):
     """YES ask at ``ask`` with a YES bid 2c below (finite spread, uncrossed)."""
     return book(yes_asks=[(ask, qty)], yes_bids=[(str(D(ask) - D("0.02")), "10")])
 
@@ -49,7 +49,7 @@ def bk_at(ask: str, qty: str = "1000"):  # noqa: ANN201
 RM = HardRiskManager(limits(), FEES, slippage_buffer=D("0.005"))
 
 
-def check(prop=None, **kw):  # noqa: ANN001, ANN003, ANN201
+def check(prop=None, **kw):
     return RM.check(prop or proposal(), risk_ctx(**kw))
 
 
@@ -438,6 +438,13 @@ def test_c_live_eligibility_needs_independent_and_accepted(
 def test_c_in_live_is_additionally_limited_by_canary_total_risk() -> None:
     d = check(proposal(qty="500"), mode=Mode.LIVE)
     assert d.approved and d.max_loss <= D("5")
+
+
+def test_live_requires_risk_budget_confirmed_at_arming() -> None:
+    d = check(proposal(qty="500"), mode=Mode.LIVE, live_budget=None)
+    assert not d.approved and "live_without_confirmed_risk_budget" in d.reasons
+    d2 = check(proposal(qty="500"), mode=Mode.LIVE, live_budget="2")
+    assert d2.approved and d2.max_loss <= D("2")
     exp = Exposure([ExposureItem("o", ("event:Z",), D("4.5"), "position")])
     d2 = check(proposal(qty="500"), mode=Mode.LIVE, exposure=exp)
     assert d2.max_loss <= D("0.5")
@@ -471,10 +478,6 @@ def test_every_rejection_has_a_reason_and_zero_size() -> None:
     assert not d.approved and d.reasons and d.quantity == 0 and d.max_loss == 0
 
 
-@pytest.mark.xfail(strict=True, reason="BUG: risk check only tests proposal.expected_price / "
-                   "limit_price against the >0.80 screen, not the fresh book's executable ask; "
-                   "a proposal (limit .85) is approved when the fresh best ask is 0.70 "
-                   "(risk/manager.py section 5)")
 def test_executable_price_on_fresh_book_must_still_exceed_floor() -> None:
     cheap = bk_at("0.70")
     p = proposal(limit="0.85", expected="0.85", est=estimate(q="0.99", q_safe="0.98"))

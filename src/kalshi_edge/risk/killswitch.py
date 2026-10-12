@@ -43,6 +43,8 @@ class KillSwitch:
             data = json.loads(raw) if raw.strip() else {}
         except json.JSONDecodeError:
             data = {"reason": raw.strip()[:200]}
+        if not isinstance(data, dict):  # any content at all means engaged
+            data = {"reason": str(data)[:200]}
         return KillState(True, str(data.get("reason", "engaged")), data.get("since"))
 
     @property

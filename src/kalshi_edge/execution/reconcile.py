@@ -6,7 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from kalshi_edge.domain import ZERO, AccountSnapshot, Outcome
+from kalshi_edge.domain import ZERO, AccountSnapshot, OrderState, Outcome
 from kalshi_edge.execution.engine import ExecutionEngine
 
 
@@ -44,6 +44,14 @@ def reconcile(engine: ExecutionEngine) -> ReconciliationReport:
     for cid, order in local_open.items():
         if cid not in venue_open:
             issues.append(f"local_open_not_on_venue:{cid}:{order.state.value}")
+
+    # Every fill must belong to an order we created and that we believe could fill.
+    for f in store.fills():
+        owner = store.get_order(f.client_order_id)
+        if owner is None:
+            issues.append(f"unmatched_fill:{f.fill_id}:{f.client_order_id}")
+        elif owner.state in (OrderState.REJECTED, OrderState.EXPIRED, OrderState.INTENT):
+            issues.append(f"fill_for_{owner.state.value}_order:{f.client_order_id}")
 
     # Positions implied by our fills (for unsettled tickers) must match the venue.
     settled = store.settled_tickers()

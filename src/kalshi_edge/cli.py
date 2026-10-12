@@ -278,6 +278,38 @@ def kill(config: ConfigOpt = Path("configs/paper.yaml"),
         raise typer.Exit(1)
     ks.reset(operator_confirmed=True)
     typer.echo("kill switch cleared")
+    _maybe_clear_latches(cfg)
+
+
+def _maybe_clear_latches(cfg: AppConfig) -> None:
+    """Latched weekly/drawdown stops need a separate, explicit human review to clear."""
+    from kalshi_edge.execution.store import Store
+    from kalshi_edge.risk.state import RiskState
+
+    if not cfg.paths.db_path.exists():
+        return
+    store = Store(cfg.paths.db_path)
+    try:
+        raw = store.get("risk_state")
+        if not raw:
+            return
+        st = RiskState.from_json(raw)
+        if not (st.weekly_halt or st.drawdown_kill or st.daily_halt):
+            return
+        typer.echo(f"latched stops: weekly={st.weekly_halt} drawdown={st.drawdown_kill} "
+                   f"daily={st.daily_halt}; equity={st.current_equity} peak={st.peak_equity}")
+        typer.echo("Clearing re-bases day/week/peak equity to the current equity.")
+        if typer.prompt("Type CLEAR-LATCHES after reviewing the losses").strip() != \
+                "CLEAR-LATCHES":
+            typer.echo("latches left in place; the trader will stay halted")
+            return
+        st.weekly_halt = st.drawdown_kill = st.daily_halt = False
+        st.peak_equity = st.start_of_day_equity = st.start_of_week_equity = st.current_equity
+        store.put("risk_state", st.to_json())
+        store.log_event(datetime.now(UTC), "latches_cleared_by_operator", st.to_json())
+        typer.echo("latches cleared")
+    finally:
+        store.close()
 
 
 if __name__ == "__main__":  # pragma: no cover

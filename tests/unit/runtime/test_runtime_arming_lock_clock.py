@@ -11,6 +11,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from tests.support import T0
 
 from kalshi_edge.config import AppConfig
 from kalshi_edge.exchange.hosts import PROD_REST_HOST, LiveAuthorization
@@ -24,7 +25,6 @@ from kalshi_edge.runtime.arming import (
 )
 from kalshi_edge.runtime.clock import ReplayClock
 from kalshi_edge.runtime.lock import InstanceLockedError, SingleInstanceLock
-from tests.support import T0
 
 D = Decimal
 SRC = Path(arming.__file__).resolve().parents[1]
@@ -44,7 +44,7 @@ class FakeTty:
 
 
 @pytest.fixture
-def human(monkeypatch: pytest.MonkeyPatch):  # noqa: ANN201
+def human(monkeypatch: pytest.MonkeyPatch):
     """Returns a function that pretends we are a human at a terminal (clears automation
     markers, fakes a TTY). Must be called inside the test body: pytest re-sets
     PYTEST_CURRENT_TEST after fixture setup."""
@@ -56,7 +56,7 @@ def human(monkeypatch: pytest.MonkeyPatch):  # noqa: ANN201
     return go
 
 
-def typed_ok(risk: str = "5"):  # noqa: ANN201
+def typed_ok(risk: str = "5"):
     """Scripted input: echoes the printed challenge, then the risk amount."""
     seen: list[str] = []
 
@@ -68,7 +68,7 @@ def typed_ok(risk: str = "5"):  # noqa: ANN201
     return inp
 
 
-def arm(cfg: AppConfig | None = None, **kw):  # noqa: ANN003, ANN201
+def arm(cfg: AppConfig | None = None, **kw):
     return interactive_arm(cfg or live_cfg(), host=PROD_REST_HOST, max_total_risk=D("5"),
                            now=T0, print_fn=lambda s: None, **kw)
 
@@ -254,9 +254,8 @@ def test_second_lock_holder_is_refused_and_release_allows_reacquire(tmp_path: Pa
 
 def test_lock_context_manager(tmp_path: Path) -> None:
     p = tmp_path / "l"
-    with SingleInstanceLock(p):
-        with pytest.raises(InstanceLockedError), SingleInstanceLock(p):
-            pass
+    with SingleInstanceLock(p), pytest.raises(InstanceLockedError), SingleInstanceLock(p):
+        pass
     with SingleInstanceLock(p):
         pass
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import socket
 from typing import Any
 
@@ -23,3 +24,22 @@ def _no_network(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(socket.socket, "connect_ex", _blocked)
     monkeypatch.setattr(socket, "create_connection", _blocked)
     monkeypatch.setattr(socket, "getaddrinfo", _blocked)
+
+
+@pytest.fixture(autouse=True)
+def _close_stores(monkeypatch: pytest.MonkeyPatch):
+    """Close every sqlite Store opened during a test (avoids ResourceWarning noise)."""
+    from kalshi_edge.execution.store import Store
+
+    opened: list[Store] = []
+    real_init = Store.__init__
+
+    def tracking_init(self: Store, *args: Any, **kwargs: Any) -> None:
+        real_init(self, *args, **kwargs)
+        opened.append(self)
+
+    monkeypatch.setattr(Store, "__init__", tracking_init)
+    yield
+    for s in opened:
+        with contextlib.suppress(Exception):  # may already be closed by the test
+            s.close()

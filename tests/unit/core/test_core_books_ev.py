@@ -6,6 +6,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 import pytest
+from tests.support import FEES, T0, TICKER, book, market
 
 from kalshi_edge.domain import (
     D,
@@ -28,7 +29,6 @@ from kalshi_edge.pricing import (
     walk_asks,
 )
 from kalshi_edge.runtime.clock import ReplayClock
-from tests.support import FEES, T0, TICKER, book, market
 
 ONE = Decimal(1)
 
@@ -208,7 +208,7 @@ def test_win_payout_is_one_dollar_per_contract() -> None:
 
 
 def test_buying_no_wins_when_result_no() -> None:
-    cost, fee, pay, venue = _buy_and_settle(SettlementResult.NO, Outcome.NO, "10", "0.88")
+    cost, _fee, pay, venue = _buy_and_settle(SettlementResult.NO, Outcome.NO, "10", "0.88")
     assert pay == 10 and venue.cash == D("1000") - cost + pay
 
 

@@ -6,7 +6,6 @@ import socket
 
 import httpx
 import pytest
-
 from tests.conftest import NetworkAccessError
 
 

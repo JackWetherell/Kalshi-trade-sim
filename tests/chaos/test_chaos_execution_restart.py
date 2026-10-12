@@ -7,6 +7,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from tests.support import T0, Rig, make_rig, market
 
 from kalshi_edge.domain import (
     OrderIntent,
@@ -17,7 +18,6 @@ from kalshi_edge.domain import (
 )
 from kalshi_edge.execution import DuplicateIntent
 from kalshi_edge.risk import KillSwitch
-from tests.support import T0, Rig, make_rig, market
 
 D = Decimal
 TK = market().ticker
@@ -38,7 +38,7 @@ class FlakyQuery:
         self.real = rig.venue.get_order
         rig.venue.get_order = self  # type: ignore[method-assign]
 
-    def __call__(self, cid: str):  # noqa: ANN204
+    def __call__(self, cid: str):
         if self.n is None or self.n > 0:
             if self.n is not None:
                 self.n -= 1
@@ -71,8 +71,8 @@ def test_timeout_after_accept_then_restart_does_not_duplicate(tmp_path: Path) ->
     # crash + restart with the outage over: startup reconcile adopts the fill, no resubmit
     flaky.restore()
     rig2 = restart(rig, tmp_path)
-    assert rig2.store.get_order(rig.store.orders()[0].client_order_id if False else
-                                list(rig.venue._orders)[0]).state is OrderState.UNKNOWN
+    cid = next(iter(rig.venue._orders))
+    assert rig2.store.get_order(cid).state is OrderState.UNKNOWN  # type: ignore[union-attr]
     rep3 = rig2.loop.startup()
     assert rep3.ok, rep3.issues
     (order,) = rig2.store.orders()
@@ -115,7 +115,7 @@ def test_query_before_retry_no_second_post_for_same_decision(tmp_path: Path) -> 
     submits: list[str] = []
     real = rig.venue.submit
 
-    def spy(i: OrderIntent):  # noqa: ANN202
+    def spy(i: OrderIntent):
         submits.append(i.client_order_id)
         return real(i)
 
@@ -157,12 +157,19 @@ def test_position_mismatch_blocks_trading(tmp_path: Path) -> None:
 def test_venue_outage_during_reconcile_blocks_trading(tmp_path: Path) -> None:
     rig = make_rig(tmp_path)
 
-    def down() -> None:
-        raise ConnectionError("exchange down")
+    real = rig.venue.get_account
+    calls = {"n": 0}
+
+    def down():
+        calls["n"] += 1
+        if calls["n"] >= 2:  # first call is the paper-settlement scan, then reconcile fails
+            raise ConnectionError("exchange down")
+        return real()
 
     rig.venue.get_account = down  # type: ignore[method-assign]
     rep = rig.loop.step()
     assert not rep.reconciled and rep.halted == "no_account_snapshot" and rep.submitted == 0
+    assert rig.venue.get_fills() == []
 
 
 def test_restart_resume_reconciles_and_loads_risk_state(tmp_path: Path) -> None:
@@ -211,7 +218,7 @@ def test_kill_with_failing_cancel_still_halts_and_does_not_crash(tmp_path: Path)
     rig = make_rig(tmp_path)
     rig.kill.engage("stop")
 
-    def boom(cid: str):  # noqa: ANN202
+    def boom(cid: str):
         raise ConnectionError("cancel failed")
 
     rig.venue.cancel = boom  # type: ignore[method-assign]

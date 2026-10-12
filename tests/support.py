@@ -83,7 +83,7 @@ def estimate(q: str = "0.97", q_safe: str = "0.95", *, outcome: Outcome = Outcom
 
 def proposal(*, strategy: StrategyId = StrategyId.POSITIVE_EV_80, qty: str = "10",
              limit: str = "0.87", expected: str | None = None, outcome: Outcome = Outcome.YES,
-             est: ProbabilityEstimate | None | str = "default",
+             est: ProbabilityEstimate | str | None = "default",
              mkt: Market | None = None, fee_pc: str = "0.01") -> TradeProposal:
     e = estimate(outcome=outcome) if est == "default" else est
     assert e is None or isinstance(e, ProbabilityEstimate)
@@ -104,21 +104,22 @@ def risk_ctx(*, bk: OrderBook | None = None, mode: Mode = Mode.PAPER,
              state: RiskState | None = None, health: HealthStatus | None = None,
              kill: bool = False, permitted: bool = True, capital: str = "1009",
              equity: str | None = None, pending_cash: str = "0",
-             now: datetime = T0) -> RiskContext:
+             now: datetime = T0, live_budget: str | None = "5") -> RiskContext:
     acct = account or AccountSnapshot(now, D(capital), (), ())
     return RiskContext(
         now=now, mode=mode, book=bk or book(ts=now), account=acct,
         exposure=exposure or Exposure(), risk_state=state or RiskState.fresh(D(capital), now),
         health=health or HealthStatus(True, True, 0), kill_engaged=kill,
         submission_permitted=permitted, strategy_capital=D(capital),
-        account_equity=D(equity or capital), pending_cash=D(pending_cash))
+        account_equity=D(equity or capital), pending_cash=D(pending_cash),
+        live_max_total_risk=None if live_budget is None else D(live_budget))
 
 
 class FixedEstimator:
     model_id = "fixed"
     model_version = "test"
 
-    def __init__(self, q_yes: Decimal, *, q_safe_haircut: Decimal = D("0"),
+    def __init__(self, q_yes: Decimal, *, q_safe_haircut: Decimal = Decimal(0),
                  status: CalibrationStatus = CalibrationStatus.ACCEPTED,
                  independent: bool = True, as_of_lag: timedelta = timedelta(0)) -> None:
         self.q_yes, self.status, self.independent = q_yes, status, independent

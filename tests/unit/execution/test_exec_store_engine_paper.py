@@ -7,6 +7,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
+from tests.support import FEES, T0, TICKER, D, book, market
 
 from kalshi_edge.domain import (
     Fill,
@@ -28,7 +29,6 @@ from kalshi_edge.execution import (
     reconcile,
 )
 from kalshi_edge.runtime.clock import ReplayClock
-from tests.support import D, FEES, T0, TICKER, book, market
 
 
 def intent(cid: str = "c1", qty: str = "10", price: str = "0.87", *,
@@ -41,7 +41,7 @@ def intent(cid: str = "c1", qty: str = "10", price: str = "0.87", *,
 
 class Env:
     def __init__(self, tmp_path: Path, cash: str = "1000", depth_fraction: str = "1",
-                 bk=None) -> None:  # noqa: ANN001
+                 bk=None) -> None:
         self.clock = ReplayClock(T0)
         self.bk = bk or book(yes_asks=[("0.87", "50"), ("0.88", "50")], yes_bids=[("0.85", "10")])
         self.mk = market()
@@ -258,7 +258,7 @@ def test_ambiguous_after_accept_resolves_by_query_without_resubmitting(env: Env)
     calls = {"n": 0}
     real = env.venue.submit
 
-    def counting(i: OrderIntent):  # noqa: ANN202
+    def counting(i: OrderIntent):
         calls["n"] += 1
         return real(i)
 
@@ -291,7 +291,7 @@ def test_ambiguous_before_accept_stays_unknown_until_grace_then_retired(env: Env
 def test_query_failure_keeps_order_unknown(env: Env) -> None:
     env.venue.fault = "timeout_after_accept"
 
-    def broken(cid: str):  # noqa: ANN202
+    def broken(cid: str):
         raise RuntimeError("network down")
 
     env.venue.get_order = broken  # type: ignore[method-assign]
@@ -358,8 +358,8 @@ def test_reconcile_flags_untracked_venue_order(env: Env) -> None:
 def test_reconcile_flags_position_mismatch_for_unknown_fill(env: Env) -> None:
     env.venue.submit(intent("ghost"))  # fills at venue; reconcile syncs fills but no order row
     rep = reconcile(env.engine)
-    # fill is imported, positions agree -> ok;  now corrupt the venue position
-    assert rep.ok
+    # a fill with no local order is itself a blocking discrepancy (needs human review)
+    assert not rep.ok and any(i.startswith("unmatched_fill") for i in rep.issues)
     env.venue._positions[(TICKER, Outcome.YES)].quantity += D(3)
     rep2 = reconcile(env.engine)
     assert not rep2.ok and any(i.startswith("position_mismatch") for i in rep2.issues)
@@ -400,9 +400,6 @@ def test_reconcile_detects_negative_cash(env: Env) -> None:
     assert "negative_cash" in reconcile(env.engine).issues
 
 
-@pytest.mark.xfail(strict=True, reason="BUG: PaperVenue._execute adds to fees_paid before the "
-                   "cash check and does not roll it back when the fill is refused atomically "
-                   "(execution/paper.py ~line 130)")
 def test_refused_fill_does_not_leak_into_fees_paid(tmp_path: Path) -> None:
     e = Env(tmp_path, cash="8.75")
     assert e.venue.submit(intent(qty="10", max_cost="8.75")).state is OrderState.REJECTED

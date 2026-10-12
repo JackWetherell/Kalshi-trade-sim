@@ -51,6 +51,7 @@ class RiskContext:
     strategy_capital: Decimal
     account_equity: Decimal  # conservative mark of the venue account
     pending_cash: Decimal = ZERO  # cash committed by intents not yet in ``account``
+    live_max_total_risk: Decimal | None = None  # amount the operator confirmed at arming
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,8 +147,11 @@ class HardRiskManager:
         p_limit = proposal.limit_price
         floor_applies = not (ctx.mode is Mode.BACKTEST and proposal.strategy_id.value
                              == "positive-ev-ablation")
+        fresh_best = book.best_ask(proposal.outcome)
         if floor_applies and not (proposal.expected_price > L.min_price_exclusive
-                                  and p_limit > L.min_price_exclusive):
+                                  and p_limit > L.min_price_exclusive
+                                  and fresh_best is not None
+                                  and fresh_best.price > L.min_price_exclusive):
             reasons.append("price_not_above_threshold")
         if p_limit > L.max_price:
             reasons.append("price_above_max")
@@ -207,6 +211,10 @@ class HardRiskManager:
                 "cash": cash_room}
         if ctx.mode is Mode.LIVE:
             caps["live_canary_total"] = L.live_canary_total_risk - ctx.exposure.total
+            if ctx.live_max_total_risk is None:
+                reasons.append("live_without_confirmed_risk_budget")
+            else:
+                caps["live_armed_total"] = ctx.live_max_total_risk - ctx.exposure.total
         cap = min(caps.values())
         metrics.update({f"room_{k}": str(v) for k, v in caps.items()})
 
@@ -221,6 +229,15 @@ class HardRiskManager:
             reasons.append(f"size_zero_after_caps:{binding}")
             qty = ZERO
         max_loss = self.max_loss_for(proposal, book, qty) if qty > ZERO else ZERO
+
+        # Executable VWAP for the final quantity must itself clear the screen.
+        if floor_applies and qty > ZERO:
+            vfills = walk_asks(book, proposal.outcome, qty)
+            vq = sum((f.quantity for f in vfills), ZERO)
+            if vq > ZERO:
+                fresh_vwap = sum((f.price * f.quantity for f in vfills), ZERO) / vq
+                if fresh_vwap <= L.min_price_exclusive:
+                    reasons.append("fresh_vwap_not_above_threshold")
 
         # Edge re-check at the final quantity on the fresh book.
         if needs_estimate and est is not None and qty > ZERO:

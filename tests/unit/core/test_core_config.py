@@ -137,9 +137,6 @@ def test_live_config_without_opt_in_has_flag_false() -> None:
     assert cfg.allow_live_trading is False
 
 
-@pytest.mark.xfail(strict=True, reason="BUG: AppConfig.allow_live_trading validator runs after "
-                   "pydantic lax coercion, so 'true'/'yes'/1/'on' become True in a live config "
-                   "(config.py _bool_strict needs mode='before' or StrictBool)")
 @pytest.mark.parametrize("bad", ["true", "True", "yes", 1, "1", "on"])
 def test_allow_live_trading_must_be_a_literal_boolean(bad: object) -> None:
     """Instruction §9: opt-in must be an explicit boolean set by the operator."""
@@ -204,9 +201,6 @@ def test_strategy_id_unknown_rejected() -> None:
         AppConfig.model_validate({"strategy": {"id": "martingale"}})
 
 
-@pytest.mark.xfail(strict=True, reason="BUG: FeeConfig has no validation; a negative or zero "
-                   "taker_rate/maker_rate makes fees negative/zero, silently inflating EV "
-                   "(config.py FeeConfig)")
 @pytest.mark.parametrize("kw", [{"taker_rate": D("-0.07")}, {"taker_rate": D("0")},
                                 {"stress_multiplier": D("0")}])
 def test_fee_config_rejects_nonsensical_rates(kw: dict[str, Decimal]) -> None:
@@ -214,22 +208,16 @@ def test_fee_config_rejects_nonsensical_rates(kw: dict[str, Decimal]) -> None:
         FeeConfig(**kw)
 
 
-@pytest.mark.xfail(strict=True, reason="BUG: FeeConfig.rounding_increment<=0 accepted; blows up "
-                   "later inside fee() instead of failing at load (config.py FeeConfig)")
 def test_fee_config_rejects_zero_rounding_increment() -> None:
     with pytest.raises(ValidationError):
         FeeConfig(rounding_increment=D("0"))
 
 
-@pytest.mark.xfail(strict=True, reason="BUG: live_canary_total_risk has no hard ceiling although "
-                   "instruction.md §9.10 caps the canary at $5 total risk")
 def test_live_canary_total_risk_has_a_hard_ceiling() -> None:
     with pytest.raises(ValidationError):
         RiskLimits(live_canary_total_risk=D("5000"))
 
 
-@pytest.mark.xfail(strict=True, reason="BUG: negative fee_reserve / min_depth_notional / stale "
-                   "thresholds accepted in YAML; can widen risk checks beyond reviewed code")
 @pytest.mark.parametrize("kw", [{"fee_reserve": D("-100")}, {"min_depth_notional": D("-1")},
                                 {"max_book_age_seconds": 1e9}, {"max_spread": D("5")}])
 def test_risk_limits_reject_check_weakening_values(kw: dict[str, Any]) -> None:

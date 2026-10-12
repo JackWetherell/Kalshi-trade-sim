@@ -81,7 +81,8 @@ class TradingLoop:
                  kill_switch: KillSwitch, alerts: AlertSink,
                  submission_gate: Callable[[datetime], bool],
                  feed_health: Callable[[], bool] = lambda: True,
-                 clock_skew: Callable[[], float] = lambda: 0.0) -> None:
+                 clock_skew: Callable[[], float] = lambda: 0.0,
+                 live_max_total_risk: Decimal | None = None) -> None:
         self.cfg = config
         self.mode: Mode = config.mode
         self.clock = clock
@@ -96,6 +97,14 @@ class TradingLoop:
         self.submission_gate = submission_gate
         self.feed_health = feed_health
         self.clock_skew = clock_skew
+        # Live risk budget = what the operator retyped at arming. If not given explicitly,
+        # take it from the arming token bound to the submission gate (if any).
+        if live_max_total_risk is None:
+            token = getattr(submission_gate, "__self__", None)
+            raw = getattr(token, "max_total_risk", None)
+            live_max_total_risk = raw if isinstance(raw, Decimal) else None
+        self.live_max_total_risk = live_max_total_risk
+        self._marks_complete = True
         self.config_hash = config.config_hash()
         self._market_cache: dict[str, Market] = {}
         saved = store.get(RISK_STATE_KEY)
@@ -122,11 +131,19 @@ class TradingLoop:
     def mark_equity(self, account: AccountSnapshot) -> Decimal:
         """Conservative mark: cash + open-order reserve + positions at best *bid* (else 0)."""
         value = account.cash + account.open_order_reserved
+        complete = True
         for pos in account.positions:
-            book = self.md.get_orderbook(pos.ticker)
-            bid = book.best_bid(pos.outcome) if book is not None else None
+            try:
+                book = self.md.get_orderbook(pos.ticker)
+            except Exception:
+                book = None
+            if book is None:
+                complete = False  # unknown, not worthless: see step()
+                continue
+            bid = book.best_bid(pos.outcome)
             if bid is not None:
                 value += min(pos.quantity, bid.quantity) * bid.price
+        self._marks_complete = complete
         return value
 
     def _estimates(self, market: Market, now: datetime
@@ -198,11 +215,24 @@ class TradingLoop:
         report.reconciled = rep.ok
         if not rep.ok:
             self.alerts.alert(now, "reconcile_failed", {"issues": rep.issues[:20]})
+            if any(i.startswith(("unmatched_fill", "fill_for_")) for i in rep.issues):
+                self.alerts.alert(now, "unmatched_fill", {"issues": rep.issues[:20]})
+            if any(i.startswith(("position_mismatch", "untracked_venue_order",
+                                 "local_open_not_on_venue", "negative_cash"))
+                   for i in rep.issues):
+                self.alerts.alert(now, "account_mismatch", {"issues": rep.issues[:20]})
         account = rep.account if rep.account is not None else None
 
         if account is not None:
             equity = self.mark_equity(account)
             report.equity = equity
+            if not self._marks_complete:
+                # A missing book must not latch loss stops on a phantom mark-to-zero, but it
+                # also blocks new trading this step (feed unhealthy).
+                self.alerts.alert(now, "stale_feed", {"reason": "position book unavailable"})
+                report.halted = "incomplete_position_marks"
+                self._persist_state()
+                return
             self.state.mark(equity, now)
             for stop in self.state.evaluate_stops(self.cfg.risk):
                 self.alerts.alert(now, stop, {"equity": str(equity)})
@@ -239,18 +269,25 @@ class TradingLoop:
             if market.category not in allow:
                 continue
             report.markets_eligible += 1
-            book = self.md.get_orderbook(market.ticker)
-            if book is None:
-                continue
-            ctx = DecisionContext(now=now, market=market, book=book,
-                                  estimates=self._estimates(market, now), fees=self.risk.fees,
-                                  strategy_equity=min(self.cfg.strategy_capital,
-                                                      self.state.current_equity))
-            proposals = self.strategy.evaluate(ctx)
-            for prop in proposals:
-                report.proposals += 1
-                self._handle_proposal(prop, report)
+            try:
+                self._evaluate_market(market, now, report)
+            except Exception as exc:  # one bad market/book never takes down the loop
+                log.exception("evaluation failed for %s", market.ticker)
+                key = f"market_error:{exc.__class__.__name__}"
+                report.rejections[key] = report.rejections.get(key, 0) + 1
         self._persist_state()
+
+    def _evaluate_market(self, market: Market, now: datetime, report: StepReport) -> None:
+        book = self.md.get_orderbook(market.ticker)
+        if book is None:
+            return
+        ctx = DecisionContext(now=now, market=market, book=book,
+                              estimates=self._estimates(market, now), fees=self.risk.fees,
+                              strategy_equity=min(self.cfg.strategy_capital,
+                                                  self.state.current_equity))
+        for prop in self.strategy.evaluate(ctx):
+            report.proposals += 1
+            self._handle_proposal(prop, report)
 
     def _handle_proposal(self, prop: TradeProposal, report: StepReport) -> None:
         now = self.clock.now()
@@ -280,7 +317,8 @@ class TradingLoop:
                 submission_permitted=self.submission_gate(now),
                 strategy_capital=self.cfg.strategy_capital,
                 account_equity=self.mark_equity(account),
-                pending_cash=sum((o.max_cost for o in unresolved), ZERO))
+                pending_cash=sum((o.max_cost for o in unresolved), ZERO),
+                live_max_total_risk=self.live_max_total_risk)
             decision = self.risk.check(prop, rctx)
         self._record(decision_id, prop, decision)
         if not decision.approved:

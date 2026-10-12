@@ -63,7 +63,7 @@ class PaperVenue:
                  seed: int = 0) -> None:
         if mode not in (Mode.PAPER, Mode.BACKTEST):
             raise ValueError("PaperVenue is only for paper/backtest modes")
-        self.mode = mode
+        self.mode: Mode = mode
         self._clock = clock
         self._fees = fees
         self._books = book_source
@@ -137,6 +137,8 @@ class PaperVenue:
             cost += qty * price + fee
             self.fees_paid += fee
         if cost > self.cash:  # fee overrun beyond max_cost: refuse atomically
+            refused = self._fills[len(self._fills) - len(legs):]
+            self.fees_paid -= sum((f.fee for f in refused), ZERO)
             del self._fills[len(self._fills) - len(legs):]
             return self._store(base)
         self.cash -= cost

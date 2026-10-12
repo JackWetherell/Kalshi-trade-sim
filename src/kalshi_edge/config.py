@@ -23,6 +23,7 @@ HARD_MAX_AGGREGATE_LOSS_FRAC = Decimal("0.10")
 HARD_MAX_CLUSTER_LOSS_FRAC = Decimal("0.05")
 HARD_MAX_KELLY_FRACTION = Decimal("0.10")
 HARD_MAX_ORDERS_PER_DAY = 10
+HARD_MAX_LIVE_CANARY_TOTAL_RISK = Decimal("5")  # instruction.md §9.10
 
 
 class _Strict(BaseModel):
@@ -68,6 +69,15 @@ class RiskLimits(_Strict):
             (Decimal("0.80") <= self.min_price_exclusive < self.max_price <= Decimal("0.99"),
              "price band"),
             (self.min_edge >= Decimal("0"), "min_edge"),
+            (Decimal("0") < self.live_canary_total_risk <= HARD_MAX_LIVE_CANARY_TOTAL_RISK,
+             "live_canary_total_risk"),
+            (self.fee_reserve >= Decimal("0"), "fee_reserve"),
+            (self.min_depth_notional >= Decimal("0"), "min_depth_notional"),
+            (Decimal("0") < self.max_spread <= Decimal("0.20"), "max_spread"),
+            (0 < self.max_book_age_seconds <= 60, "max_book_age_seconds"),
+            (0 < self.max_forecast_age_seconds <= 7 * 86400, "max_forecast_age_seconds"),
+            (self.min_seconds_to_close >= 0, "min_seconds_to_close"),
+            (0 < self.max_clock_skew_seconds <= 10, "max_clock_skew_seconds"),
         ]
         bad = [name for ok, name in checks if not ok]
         if bad:
@@ -96,6 +106,19 @@ class FeeConfig(_Strict):
     maker_rate: Decimal = Decimal("0.0175")
     rounding_increment: Decimal = Decimal("0.01")
     stress_multiplier: Decimal = Decimal("1")
+
+    @model_validator(mode="after")
+    def _sane(self) -> FeeConfig:
+        # Fees can only be modelled as at least the documented schedule (never cheaper).
+        bad = [n for n, ok in (
+            ("taker_rate", self.taker_rate >= Decimal("0.07")),
+            ("maker_rate", self.maker_rate > Decimal("0")),
+            ("rounding_increment", Decimal("0") < self.rounding_increment <= Decimal("0.01")),
+            ("stress_multiplier", self.stress_multiplier >= Decimal("1")),
+        ) if not ok]
+        if bad:
+            raise ValueError(f"fee config would understate fees: {bad}")
+        return self
 
     def schedule(self) -> FeeSchedule:
         return FeeSchedule(self.taker_rate, self.maker_rate, self.rounding_increment,
@@ -168,7 +191,7 @@ class AppConfig(_Strict):
     backtest: BacktestConfig = BacktestConfig()
     paper_scan_interval_seconds: float = 60.0
 
-    @field_validator("allow_live_trading")
+    @field_validator("allow_live_trading", mode="before")
     @classmethod
     def _bool_strict(cls, v: object) -> bool:
         if v is not True and v is not False:

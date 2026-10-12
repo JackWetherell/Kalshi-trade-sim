@@ -45,6 +45,7 @@ class ReplayDataset(ABC):
     station_map: dict[str, str] = field(default_factory=dict)
     provenance: dict[str, Any] = field(default_factory=dict)
     excluded: dict[str, int] = field(default_factory=dict)
+    restamp_books: bool = True  # synthetic: books are 'as of now'; recorded: keep snapshot ts
 
     @abstractmethod
     def book_at(self, ticker: str, t: datetime) -> OrderBook | None:

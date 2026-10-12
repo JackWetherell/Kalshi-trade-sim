@@ -1,0 +1,9 @@
+{
+  "order_id": "ord-123",
+  "client_order_id": "cid-1",
+  "fill_count": "4.00",
+  "remaining_count": "0.00",
+  "ts_ms": 1791800000000,
+  "average_fill_price": "0.8300",
+  "average_fee_paid": "0.0100"
+}

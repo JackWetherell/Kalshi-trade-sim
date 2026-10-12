@@ -1,0 +1,17 @@
+{
+  "market_positions": [
+    {
+      "ticker": "KXHIGHNY-26OCT12-T75",
+      "position_fp": "-3.00",
+      "market_exposure_dollars": "2.4600",
+      "fees_paid_dollars": "0.0400"
+    },
+    {
+      "ticker": "FLAT",
+      "position_fp": "0.00",
+      "market_exposure_dollars": "0.0000",
+      "fees_paid_dollars": "0.0000"
+    }
+  ],
+  "cursor": ""
+}

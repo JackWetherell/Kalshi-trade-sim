@@ -1,0 +1,24 @@
+{
+  "type": "orderbook_snapshot",
+  "sid": 1,
+  "seq": 1,
+  "msg": {
+    "market_ticker": "KXHIGHNY-26OCT12-T75",
+    "yes_dollars_fp": [
+      [
+        "0.8100",
+        "20.00"
+      ],
+      [
+        "0.8200",
+        "13.00"
+      ]
+    ],
+    "no_dollars_fp": [
+      [
+        "0.1600",
+        "40.00"
+      ]
+    ]
+  }
+}

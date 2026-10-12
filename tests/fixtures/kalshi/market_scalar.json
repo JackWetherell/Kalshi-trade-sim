@@ -1,0 +1,43 @@
+{
+  "market": {
+    "ticker": "KXSCAL-1",
+    "event_ticker": "KXHIGHNY-26OCT12",
+    "market_type": "scalar",
+    "title": "NYC high above 75F?",
+    "status": "active",
+    "open_time": "2026-10-11T14:00:00Z",
+    "close_time": "2026-10-12T23:59:00Z",
+    "expected_expiration_time": "2026-10-13T14:00:00Z",
+    "result": "",
+    "can_close_early": false,
+    "strike_type": "greater",
+    "floor_strike": 75,
+    "price_level_structure": "tapered_deci_cent",
+    "price_ranges": [
+      {
+        "start": "0.0000",
+        "end": "0.1000",
+        "step": "0.0010"
+      },
+      {
+        "start": "0.1000",
+        "end": "0.9000",
+        "step": "0.0100"
+      },
+      {
+        "start": "0.9000",
+        "end": "1.0000",
+        "step": "0.0010"
+      }
+    ],
+    "fractional_trading_enabled": false,
+    "yes_bid_dollars": "0.8200",
+    "yes_ask_dollars": "0.8400",
+    "no_bid_dollars": "0.1600",
+    "no_ask_dollars": "0.1800",
+    "last_price_dollars": "0.8300",
+    "volume_fp": "1200.00",
+    "open_interest_fp": "300.00",
+    "rules_primary": "If the high is above 75F ..."
+  }
+}

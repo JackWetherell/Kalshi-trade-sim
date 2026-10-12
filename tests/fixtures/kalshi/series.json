@@ -1,0 +1,10 @@
+{
+  "series": {
+    "ticker": "KXHIGHNY",
+    "title": "NYC high temperature",
+    "category": "Climate and Weather",
+    "frequency": "daily",
+    "fee_type": "quadratic",
+    "fee_multiplier": 1
+  }
+}

@@ -112,6 +112,9 @@ class ExchangeConfig(_Strict):
     demo_private_key_path_env: str = "KALSHI_DEMO_PRIVATE_KEY_PATH"
     markets_page_limit: int = 200
     series_allowlist: tuple[str, ...] = ()
+    # Series whose resolution rules / source-of-truth the operator has personally reviewed.
+    # Markets from any other series are marked rules_verified=False and are never traded.
+    rules_verified_series: tuple[str, ...] = ()
 
 
 class PathsConfig(_Strict):

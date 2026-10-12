@@ -4,10 +4,13 @@ mode: paper
 strategy_capital: "1009"
 exchange:
   environment: prod_public
+  # Daily-high temperature series (tickers per public Kalshi listings; verify they are current).
+  series_allowlist: ["KXHIGHNY", "KXHIGHCHI", "KXHIGHMIA", "KXHIGHLAX", "KXHIGHAUS", "KXHIGHDEN", "KXHIGHPHIL"]
+  rules_verified_series: []   # operator: add series only after reviewing their rules
   max_requests_per_second: 2.0
   markets_page_limit: 200
 paths:
   state_dir: var/research
   data_dir: data
 risk:
-  category_allowlist: ["weather", "economics"]
+  category_allowlist: ["Climate and Weather"]

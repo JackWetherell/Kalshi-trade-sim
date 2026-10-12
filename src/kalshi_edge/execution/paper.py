@@ -228,3 +228,53 @@ class PaperVenue:
                                         "ts": self._clock.now()})
             del self._positions[key]
         return payout
+
+    # ------------------------------------------------------------- persistence
+    def snapshot(self) -> dict[str, object]:
+        """Serializable virtual-account state (paper mode survives restarts)."""
+        return {
+            "cash": str(self.cash), "realized_pnl": str(self.realized_pnl),
+            "fees_paid": str(self.fees_paid), "fill_seq": self._fill_seq,
+            "positions": [{"ticker": p.ticker, "event_ticker": p.event_ticker,
+                           "category": p.category, "outcome": p.outcome.value,
+                           "quantity": str(p.quantity), "cost_basis": str(p.cost_basis)}
+                          for p in self._positions.values()],
+            "orders": [{"cid": o.client_order_id, "xid": o.exchange_order_id,
+                        "ticker": o.ticker, "outcome": o.outcome.value, "state": o.state.value,
+                        "quantity": str(o.quantity), "filled": str(o.filled_quantity),
+                        "remaining": str(o.remaining_quantity), "limit": str(o.limit_price),
+                        "ts": o.ts.isoformat()} for o in self._orders.values()],
+            "reserved": {k: str(v) for k, v in self._reserved.items()},
+            "fills": [{"id": f.fill_id, "cid": f.client_order_id, "xid": f.exchange_order_id,
+                       "ticker": f.ticker, "outcome": f.outcome.value, "qty": str(f.quantity),
+                       "price": str(f.price), "fee": str(f.fee), "taker": f.is_taker,
+                       "ts": f.ts.isoformat()} for f in self._fills],
+        }
+
+    def restore(self, data: dict[str, object]) -> None:
+        def _list(key: str) -> list[dict[str, str]]:
+            v = data.get(key, [])
+            return v if isinstance(v, list) else []
+
+        self.cash = Decimal(str(data["cash"]))
+        self.realized_pnl = Decimal(str(data.get("realized_pnl", "0")))
+        self.fees_paid = Decimal(str(data.get("fees_paid", "0")))
+        self._fill_seq = int(str(data.get("fill_seq", 0)))
+        self._positions = {}
+        for p in _list("positions"):
+            pos = _Pos(p["ticker"], p["event_ticker"], p["category"], Outcome(p["outcome"]),
+                       Decimal(p["quantity"]), Decimal(p["cost_basis"]))
+            self._positions[(pos.ticker, pos.outcome)] = pos
+        self._orders = {}
+        for o in _list("orders"):
+            self._orders[o["cid"]] = OrderStatus(
+                o["cid"], o["xid"], o["ticker"], Outcome(o["outcome"]), OrderState(o["state"]),
+                Decimal(o["quantity"]), Decimal(o["filled"]), Decimal(o["remaining"]),
+                Decimal(o["limit"]), datetime.fromisoformat(o["ts"]))
+        reserved = data.get("reserved", {})
+        self._reserved = ({k: Decimal(str(v)) for k, v in reserved.items()}
+                          if isinstance(reserved, dict) else {})
+        self._fills = [Fill(f["id"], f["cid"], f["xid"], f["ticker"], Outcome(f["outcome"]),
+                            Decimal(f["qty"]), Decimal(f["price"]), Decimal(f["fee"]),
+                            bool(f["taker"]), datetime.fromisoformat(f["ts"]))
+                       for f in _list("fills")]

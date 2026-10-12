@@ -113,12 +113,12 @@ def test_no_trade_when_q_at_market(tmp_path: Path) -> None:
 
 
 def test_uncalibrated_estimate_never_trades(tmp_path: Path) -> None:
-    loop, venue, *_ = _build(tmp_path, D("0.99"), status=CalibrationStatus.INSUFFICIENT)
+    loop, _venue, *_ = _build(tmp_path, D("0.99"), status=CalibrationStatus.INSUFFICIENT)
     assert loop.step().submitted == 0
 
 
 def test_kill_switch_blocks_everything(tmp_path: Path) -> None:
-    loop, venue, *_ = _build(tmp_path, D("0.95"))
+    loop, _venue, *_ = _build(tmp_path, D("0.95"))
     loop.kill.engage("test")
     rep = loop.step()
     assert rep.halted and rep.halted.startswith("kill_switch")
@@ -126,6 +126,6 @@ def test_kill_switch_blocks_everything(tmp_path: Path) -> None:
 
 
 def test_naive_baseline_runs_in_backtest(tmp_path: Path) -> None:
-    loop, venue, *_ = _build(tmp_path, D("0.5"), strategy=StrategyId.NAIVE_80)
+    loop, _venue, *_ = _build(tmp_path, D("0.5"), strategy=StrategyId.NAIVE_80)
     rep = loop.step()
     assert rep.submitted == 1, rep.as_dict()

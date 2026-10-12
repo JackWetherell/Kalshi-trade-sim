@@ -1,0 +1,26 @@
+# Paper trading with the naive-80 research baseline (virtual money, public data only).
+# No credential is read; the paper venue has no route to any order endpoint.
+mode: paper
+strategy_capital: "1009"
+allow_live_trading: false
+strategy:
+  id: naive-80        # RESEARCH CONTROL ONLY: exercises paper plumbing; never live-eligible
+  sizing: kelly
+risk:
+  min_price_exclusive: "0.80"
+  max_price: "0.97"
+  min_edge: "0.02"
+  kelly_fraction: "0.10"
+  max_book_age_seconds: 3.0
+  category_allowlist: ["Climate and Weather"]  # Kalshi series category string
+exchange:
+  environment: prod_public
+  # Daily-high temperature series (tickers per public Kalshi listings; verify they are current).
+  series_allowlist: ["KXHIGHNY", "KXHIGHCHI", "KXHIGHMIA", "KXHIGHLAX", "KXHIGHAUS", "KXHIGHDEN", "KXHIGHPHIL"]
+  # PAPER ONLY (virtual money): treat these series' rules as reviewed so the plumbing can be
+  # exercised. For demo/live the operator must review each series' rules personally.
+  rules_verified_series: ["KXHIGHNY", "KXHIGHCHI", "KXHIGHMIA", "KXHIGHLAX", "KXHIGHAUS", "KXHIGHDEN", "KXHIGHPHIL"]
+  max_requests_per_second: 2.0
+paths:
+  state_dir: var/paper-baseline
+paper_scan_interval_seconds: 60

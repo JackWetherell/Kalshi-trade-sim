@@ -8,9 +8,12 @@ strategy:
   id: positive-ev-80
 risk:
   max_orders_per_day: 10
-  category_allowlist: ["weather"]
+  category_allowlist: ["Climate and Weather"]  # Kalshi series category string
 exchange:
   environment: demo
+  # Daily-high temperature series (tickers per public Kalshi listings; verify they are current).
+  series_allowlist: ["KXHIGHNY", "KXHIGHCHI", "KXHIGHMIA", "KXHIGHLAX", "KXHIGHAUS", "KXHIGHDEN", "KXHIGHPHIL"]
+  rules_verified_series: []   # operator: add series only after reviewing their rules
   demo_key_id_env: KALSHI_DEMO_KEY_ID
   demo_private_key_path_env: KALSHI_DEMO_PRIVATE_KEY_PATH
   max_requests_per_second: 2.0

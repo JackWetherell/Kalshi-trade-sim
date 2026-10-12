@@ -12,9 +12,14 @@ risk:
   min_edge: "0.02"
   kelly_fraction: "0.10"
   max_book_age_seconds: 3.0
-  category_allowlist: ["weather"]
+  category_allowlist: ["Climate and Weather"]  # Kalshi series category string
 exchange:
   environment: prod_public
+  # Daily-high temperature series (tickers per public Kalshi listings; verify they are current).
+  series_allowlist: ["KXHIGHNY", "KXHIGHCHI", "KXHIGHMIA", "KXHIGHLAX", "KXHIGHAUS", "KXHIGHDEN", "KXHIGHPHIL"]
+  # PAPER ONLY (virtual money): treat these series' rules as reviewed so the plumbing can be
+  # exercised. For demo/live the operator must review each series' rules personally.
+  rules_verified_series: ["KXHIGHNY", "KXHIGHCHI", "KXHIGHMIA", "KXHIGHLAX", "KXHIGHAUS", "KXHIGHDEN", "KXHIGHPHIL"]
   max_requests_per_second: 2.0
 paths:
   state_dir: var/paper

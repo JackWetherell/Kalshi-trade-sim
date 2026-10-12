@@ -1,0 +1,13 @@
+# Research / data-collection configuration: read-only public production market data.
+# Never needs or uses credentials. Used by `kalshi-edge data sync` and `data record`.
+mode: paper
+strategy_capital: "1009"
+exchange:
+  environment: prod_public
+  max_requests_per_second: 2.0
+  markets_page_limit: 200
+paths:
+  state_dir: var/research
+  data_dir: data
+risk:
+  category_allowlist: ["weather", "economics"]

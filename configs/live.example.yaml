@@ -1,0 +1,21 @@
+# EXAMPLE ONLY — NOT ARMED, NO CREDENTIALS.
+# Live trading additionally requires (see docs/DEPLOYMENT.md and LIVE_TRADING_CHECKLIST.md):
+#   1. The operator copies this to a private path OUTSIDE the repo and sets
+#      allow_live_trading: true themselves after review;
+#   2. a separate production credential provisioned by the operator outside the repo;
+#   3. a fresh interactive TTY arming ceremony (expires after <= 24h and on restart).
+# None of these steps may be performed by an AI agent or script.
+mode: live
+strategy_capital: "1009"
+allow_live_trading: false     # operator must change this by hand, in a private copy
+strategy:
+  id: positive-ev-80
+  sizing: kelly
+risk:
+  per_entry_max_loss_frac: "0.005"   # canary: ~$5 max total risk enforced separately
+  max_orders_per_day: 1
+  category_allowlist: []             # operator must name explicit categories
+exchange:
+  environment: prod
+paths:
+  state_dir: var/live

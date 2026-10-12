@@ -1,0 +1,21 @@
+# Paper trading: LIVE PUBLIC production market data, LOCAL virtual exchange only.
+# No credential is read; the paper venue has no route to any order endpoint.
+mode: paper
+strategy_capital: "1009"
+allow_live_trading: false
+strategy:
+  id: positive-ev-80
+  sizing: kelly
+risk:
+  min_price_exclusive: "0.80"
+  max_price: "0.97"
+  min_edge: "0.02"
+  kelly_fraction: "0.10"
+  max_book_age_seconds: 3.0
+  category_allowlist: ["weather"]
+exchange:
+  environment: prod_public
+  max_requests_per_second: 2.0
+paths:
+  state_dir: var/paper
+paper_scan_interval_seconds: 60

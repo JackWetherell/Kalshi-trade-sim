@@ -1,0 +1,30 @@
+# secrets
+.env
+*.pem
+*.key
+secrets/
+*credential*
+!src/**/credential*.py
+# runtime state
+var/
+*.sqlite3
+*.sqlite3-*
+*.lock
+KILL_SWITCH
+# data dumps (manifests/templates tracked)
+data/*
+!data/README.md
+!data/manifest.template.json
+# python
+__pycache__/
+*.pyc
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+# reports: keep committed curated runs under reports/committed/
+reports/*
+!reports/README.md
+!reports/committed/

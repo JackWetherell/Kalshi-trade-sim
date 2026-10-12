@@ -1,0 +1,19 @@
+# Kalshi DEMO environment (mock funds). Requires human-provisioned DEMO-only credentials
+# supplied via the env vars named below (never commit them). Demo behaviour may not
+# resemble production liquidity or fills; demo P&L is not evidence of edge.
+mode: demo
+strategy_capital: "1009"
+allow_live_trading: false
+strategy:
+  id: positive-ev-80
+risk:
+  max_orders_per_day: 10
+  category_allowlist: ["weather"]
+exchange:
+  environment: demo
+  demo_key_id_env: KALSHI_DEMO_KEY_ID
+  demo_private_key_path_env: KALSHI_DEMO_PRIVATE_KEY_PATH
+  max_requests_per_second: 2.0
+paths:
+  state_dir: var/demo
+paper_scan_interval_seconds: 60

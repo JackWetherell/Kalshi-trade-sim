@@ -39,7 +39,8 @@ class LiveAuthorization(Protocol):
     """Issued by the runtime arming ceremony (runtime/arming.py). Never created by tests
     against a real production host."""
 
-    host: str
+    @property
+    def host(self) -> str: ...
 
     def is_valid(self, now: datetime) -> bool: ...
 

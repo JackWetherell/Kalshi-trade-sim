@@ -1,7 +1,6 @@
 # kalshi-edge public order-book RECORDER (systemd --user unit). Read-only public data, no credentials.
 # Writes gzip JSONL snapshots under data/ for later backtests. Runs continuously
-# (`data record` with rounds=0). For a one-shot-per-interval style, use the .timer instead and
-# change ExecStart to add `--rounds 1` (see kalshi-edge-recorder.timer).
+# (`data record` with --rounds 0 = until stopped), one snapshot round every --interval seconds.
 #
 # INSTALL: replace %REPO_DIR%, copy to ~/.config/systemd/user/, daemon-reload, enable --now.
 

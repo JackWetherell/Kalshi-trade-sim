@@ -181,8 +181,16 @@ class TradingLoop:
 
     # -------------------------------------------------------------------- step
     def step(self) -> StepReport:
-        now = self.clock.now()
-        report = StepReport(ts=now)
+        """One pipeline pass. Always writes a ``step`` heartbeat event, even when halted."""
+        report = StepReport(ts=self.clock.now())
+        try:
+            self._step(report)
+        finally:
+            self.store.log_event(report.ts, "step", report.as_dict())
+        return report
+
+    def _step(self, report: StepReport) -> None:
+        now = report.ts
         self.settle_resolved()
 
         rec = reconcile(self.engine)
@@ -210,13 +218,13 @@ class TradingLoop:
                 self.engine.cancel_all_open("kill_switch")  # never liquidates positions
             except Exception:
                 log.exception("cancel on kill failed")
-            return report
+            return
         if account is None:
             report.halted = "no_account_snapshot"
-            return report
+            return
         if self.state.daily_halt or self.state.weekly_halt or self.state.drawdown_kill:
             report.halted = "loss_stop"
-            return report
+            return
 
         allow = set(self.cfg.risk.category_allowlist)
         try:
@@ -224,7 +232,7 @@ class TradingLoop:
         except Exception as exc:
             self.alerts.alert(now, "stale_feed", {"error": str(exc)[:200]})
             report.halted = "market_discovery_failed"
-            return report
+            return
         for market in markets:
             report.markets_scanned += 1
             self._market_cache[market.ticker] = market
@@ -243,8 +251,6 @@ class TradingLoop:
                 report.proposals += 1
                 self._handle_proposal(prop, report)
         self._persist_state()
-        self.store.log_event(now, "step", report.as_dict())
-        return report
 
     def _handle_proposal(self, prop: TradeProposal, report: StepReport) -> None:
         now = self.clock.now()

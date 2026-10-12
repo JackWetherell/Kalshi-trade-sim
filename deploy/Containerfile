@@ -1,0 +1,24 @@
+# kalshi-edge paper/demo container (optional). Build from the repo root:
+#   podman build -f deploy/Containerfile -t kalshi-edge .
+# No secrets are baked in. For demo, pass DEMO-ONLY credentials at runtime
+# (--env-file outside the repo and a read-only key mount). NEVER pass production credentials.
+# There is deliberately no live entrypoint: live arming needs an interactive human TTY and an
+# in-memory token, so a container restart can never re-arm live trading.
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 UV_LINK_MODE=copy UV_COMPILE_BYTECODE=1
+RUN pip install --no-cache-dir uv && useradd --create-home --uid 10001 trader
+WORKDIR /app
+COPY pyproject.toml uv.lock README.md ./
+COPY src ./src
+COPY configs ./configs
+RUN uv sync --frozen --no-dev && mkdir -p var data reports && chown -R trader:trader /app
+USER trader
+
+# Production credential variables are stripped even if the runtime passes them in.
+ENV KALSHI_PROD_KEY_ID= KALSHI_PROD_PRIVATE_KEY_PATH=
+VOLUME ["/app/var", "/app/data", "/app/reports"]
+HEALTHCHECK --interval=5m --timeout=60s --start-period=2m \
+  CMD ["uv", "run", "--frozen", "kalshi-edge", "doctor"]
+# Default: paper mode (virtual money, public data). Override with: run --mode demo --config configs/demo.yaml
+CMD ["uv", "run", "--frozen", "kalshi-edge", "run", "--mode", "paper", "--config", "configs/paper.yaml"]
